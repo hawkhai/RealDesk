@@ -256,6 +256,11 @@ class RemoteHost:
         """Handle incoming WebRTC offer"""
         logger.info("Received offer, creating answer...")
         
+        # Check if peer connection is in a valid state
+        if not self.pc or self.pc.connectionState == "closed":
+            logger.error("Cannot handle offer in signaling state \"closed\"")
+            return
+        
         # Set remote description
         offer = RTCSessionDescription(sdp=data["sdp"], type="offer")
         await self.pc.setRemoteDescription(offer)
@@ -281,21 +286,28 @@ class RemoteHost:
     
     async def handle_ice_candidate(self, data):
         """Handle incoming ICE candidate"""
+        # Check if peer connection is in a valid state
+        if not self.pc or self.pc.connectionState == "closed":
+            logger.error("Cannot handle candidate in signaling state \"closed\"")
+            return
+            
         # Handle both Ayame format and direct format
         ice_data = data.get("ice")
         if ice_data:
             # Ayame format: {'type': 'candidate', 'ice': {...}}
+            # aiortc RTCIceCandidate expects positional arguments, not keyword 'candidate'
             candidate = RTCIceCandidate(
-                candidate=ice_data["candidate"],
-                sdpMid=ice_data["sdpMid"],
-                sdpMLineIndex=ice_data["sdpMLineIndex"]
+                ice_data["candidate"],
+                ice_data["sdpMid"],
+                ice_data["sdpMLineIndex"]
             )
         else:
             # Direct format: {'type': 'candidate', 'candidate': '...', ...}
+            # aiortc RTCIceCandidate expects positional arguments, not keyword 'candidate'
             candidate = RTCIceCandidate(
-                candidate=data["candidate"],
-                sdpMid=data["sdpMid"],
-                sdpMLineIndex=data["sdpMLineIndex"]
+                data["candidate"],
+                data["sdpMid"],
+                data["sdpMLineIndex"]
             )
         
         await self.pc.addIceCandidate(candidate)

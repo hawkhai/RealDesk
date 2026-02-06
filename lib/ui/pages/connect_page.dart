@@ -14,7 +14,7 @@ class _ConnectPageState extends State<ConnectPage> {
   final _logger = Logger();
   final _formKey = GlobalKey<FormState>();
   final _signalingUrlController = TextEditingController(
-    text: 'ws://36.99.188.174:3000/signaling',
+    text: 'ws://10.12.168.211:3000/signaling',
   );
   final _roomIdController = TextEditingController(text: 'test-room');
   final _tokenController = TextEditingController();

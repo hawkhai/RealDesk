@@ -2,8 +2,8 @@ class RealDeskSettings {
   static const List<Map<String, dynamic>> defaultIceServers = [
     {
       'urls': [
-        'turn:36.99.188.174:3479?transport=udp',
-        'turn:36.99.188.174:3479?transport=tcp',
+        'turn:10.12.168.211:3479?transport=udp',
+        'turn:10.12.168.211:3479?transport=tcp',
       ],
       'username': 'yrxt',
       'credential': 'yrxt@unionstech.cn',
@@ -13,7 +13,7 @@ class RealDeskSettings {
   ];
 
   static const String defaultIceServersJson =
-      '[{"urls":["turn:36.99.188.174:3479?transport=udp","turn:36.99.188.174:3479?transport=tcp"],"username":"yrxt","credential":"yrxt@unionstech.cn"},{"urls":"stun:stun.l.google.com:19302"},{"urls":"stun:stun1.l.google.com:19302"}]';
+      '[{"urls":["turn:10.12.168.211:3479?transport=udp","turn:10.12.168.211:3479?transport=tcp"],"username":"yrxt","credential":"yrxt@unionstech.cn"},{"urls":"stun:stun.l.google.com:19302"},{"urls":"stun:stun1.l.google.com:19302"}]';
 
   RealDeskSettings({
     this.insecure = false,
