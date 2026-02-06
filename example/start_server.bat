@@ -1,0 +1,1 @@
+python remote_host.py --signaling-url ws://localhost:3000 --room-id test-room

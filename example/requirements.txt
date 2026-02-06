@@ -1,0 +1,21 @@
+# RealDesk Python Remote Host and Signaling Server Requirements
+
+# WebRTC support
+aiortc>=1.6.0
+av>=10.0.0
+
+# WebSocket support  
+websockets>=11.0.2
+
+# Screen capture
+mss>=9.0.1
+
+# Image processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Optional: For audio support (not implemented in current example)
+# pyaudio>=0.2.11
+
+# Development and testing
+asyncio-mqtt>=0.13.0  # For testing MQTT integration if needed
