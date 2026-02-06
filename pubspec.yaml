@@ -10,9 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # WebRTC - Using locally compiled version
-  flutter_webrtc:
-    path: ../flutter-webrtc
+  # WebRTC - Using pub.dev version
+  flutter_webrtc: ^0.9.48
   
   # WebSocket
   web_socket_channel: ^2.4.0
@@ -22,7 +21,7 @@ dependencies:
   
   # JSON serialization
   freezed_annotation: ^2.4.1
-  json_annotation: ^4.9.0
+  json_annotation: ^4.8.1
   html: ^0.15.4
   
   # State management
@@ -48,7 +47,7 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.0
   freezed: ^2.4.5
-  json_serializable: ^6.7.1
+  json_serializable: 6.7.1
 
 flutter:
   uses-material-design: true
