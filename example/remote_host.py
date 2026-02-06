@@ -291,26 +291,50 @@ class RemoteHost:
             logger.error("Cannot handle candidate in signaling state \"closed\"")
             return
             
-        # Handle both Ayame format and direct format
-        ice_data = data.get("ice")
-        if ice_data:
-            # Ayame format: {'type': 'candidate', 'ice': {...}}
-            # aiortc RTCIceCandidate expects positional arguments, not keyword 'candidate'
-            candidate = RTCIceCandidate(
-                ice_data["candidate"],
-                ice_data["sdpMid"],
-                ice_data["sdpMLineIndex"]
-            )
-        else:
-            # Direct format: {'type': 'candidate', 'candidate': '...', ...}
-            # aiortc RTCIceCandidate expects positional arguments, not keyword 'candidate'
-            candidate = RTCIceCandidate(
-                data["candidate"],
-                data["sdpMid"],
-                data["sdpMLineIndex"]
-            )
-        
-        await self.pc.addIceCandidate(candidate)
+        try:
+            # Handle both Ayame format and direct format
+            ice_data = data.get("ice")
+            if ice_data:
+                # Ayame format: {'type': 'candidate', 'ice': {...}}
+                candidate_string = ice_data["candidate"]
+                sdp_mid = ice_data["sdpMid"]
+                sdp_mline_index = ice_data["sdpMLineIndex"]
+            else:
+                # Direct format: {'type': 'candidate', 'candidate': '...', ...}
+                candidate_string = data["candidate"]
+                sdp_mid = data["sdpMid"]
+                sdp_mline_index = data["sdpMLineIndex"]
+            
+            # For aiortc, create RTCIceCandidate with proper parameters
+            # Parse the candidate string to extract required fields
+            parts = candidate_string.split()
+            if len(parts) >= 8:
+                component = int(parts[1])
+                protocol = parts[2]
+                priority = int(parts[3])
+                ip = parts[4]
+                port = int(parts[5])
+                typ = parts[7] if len(parts) > 7 else "host"
+                
+                candidate = RTCIceCandidate(
+                    component=component,
+                    foundation=parts[0],
+                    ip=ip,
+                    port=port,
+                    priority=priority,
+                    protocol=protocol,
+                    type=typ
+                )
+                candidate.sdpMid = sdp_mid
+                candidate.sdpMLineIndex = sdp_mline_index
+            else:
+                logger.warning(f"Invalid candidate format: {candidate_string}")
+                return
+            
+            await self.pc.addIceCandidate(candidate)
+        except Exception as e:
+            logger.error(f"Failed to add ICE candidate: {e}")
+            # Skip this candidate and continue
     
     async def create_offer(self):
         """Create and send WebRTC offer"""
