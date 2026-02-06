@@ -14,6 +14,9 @@ mss>=9.0.1
 opencv-python>=4.8.0
 numpy>=1.24.0
 
+# Input automation for remote control
+pyautogui>=0.9.54
+
 # Optional: For audio support (not implemented in current example)
 # pyaudio>=0.2.11
 

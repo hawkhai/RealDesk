@@ -12,7 +12,7 @@ import websockets
 import argparse
 import signal
 import sys
-from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration, RTCIceServer
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceCandidate, RTCConfiguration, RTCIceServer, RTCDataChannel
 from aiortc.contrib.media import MediaPlayer
 import cv2
 import numpy as np
@@ -21,6 +21,8 @@ import time
 import mss
 import threading
 from queue import Queue
+import pyautogui
+import platform
 
 # Configure logging
 logging.basicConfig(
@@ -112,6 +114,11 @@ class RemoteHost:
         self.pc = None
         self.screen_track = None
         self.running = False
+        self.data_channels = {}
+        
+        # Configure pyautogui for input injection
+        pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0
         
         # Configuration
         self.fps = 30
@@ -196,6 +203,16 @@ class RemoteHost:
         @self.pc.on("iceconnectionstatechange")
         async def on_iceconnectionstatechange():
             logger.info(f"ICE connection state: {self.pc.iceConnectionState}")
+        
+        # Handle data channels
+        @self.pc.on("datachannel")
+        def on_datachannel(channel):
+            logger.info(f"Data channel opened: {channel.label}")
+            self.data_channels[channel.label] = channel
+            
+            @channel.on("message")
+            def on_message(message):
+                asyncio.create_task(self.handle_data_channel_message(channel.label, message))
             
         logger.info("Peer connection created")
     
@@ -212,6 +229,212 @@ class RemoteHost:
         }
         
         await self.websocket.send(json.dumps(candidate_message))
+    
+    async def handle_data_channel_message(self, channel_label: str, message):
+        """Handle incoming data channel messages from client"""
+        try:
+            if isinstance(message, str):
+                data = json.loads(message)
+            else:
+                # Handle binary protobuf messages if needed
+                logger.debug(f"Received binary message on {channel_label}")
+                return
+                
+            msg_type = data.get('type')
+            logger.debug(f"Received {msg_type} message on {channel_label}")
+            
+            # Handle different input types
+            if msg_type == 'mouseAbs':
+                await self.handle_mouse_abs(data)
+            elif msg_type == 'mouseRel':
+                await self.handle_mouse_rel(data)
+            elif msg_type == 'mouseWheel':
+                await self.handle_mouse_wheel(data)
+            elif msg_type == 'keyboard':
+                await self.handle_keyboard(data)
+            elif msg_type == 'gamepadXInput':
+                await self.handle_gamepad(data)
+            elif msg_type == 'system':
+                await self.handle_system_command(data)
+            else:
+                logger.warning(f"Unknown message type: {msg_type}")
+                
+        except Exception as e:
+            logger.error(f"Error handling data channel message: {e}")
+    
+    async def handle_mouse_abs(self, data):
+        """Handle absolute mouse positioning"""
+        try:
+            x = data.get('x', 0)
+            y = data.get('y', 0)
+            display_w = data.get('displayW', 1920)
+            display_h = data.get('displayH', 1080)
+            buttons = data.get('buttons', 0)
+            
+            # Get screen size
+            screen_w, screen_h = pyautogui.size()
+            
+            # Convert relative coordinates to screen coordinates
+            screen_x = int((x / display_w) * screen_w)
+            screen_y = int((y / display_h) * screen_h)
+            
+            # Move mouse
+            pyautogui.moveTo(screen_x, screen_y)
+            
+            # Handle button clicks
+            self.handle_mouse_buttons(buttons)
+            
+        except Exception as e:
+            logger.error(f"Error handling mouse abs: {e}")
+    
+    async def handle_mouse_rel(self, data):
+        """Handle relative mouse movement"""
+        try:
+            dx = data.get('dx', 0)
+            dy = data.get('dy', 0)
+            buttons = data.get('buttons', 0)
+            
+            # Move mouse relatively
+            if dx != 0 or dy != 0:
+                pyautogui.moveRel(dx, dy)
+            
+            # Handle button clicks
+            self.handle_mouse_buttons(buttons)
+            
+        except Exception as e:
+            logger.error(f"Error handling mouse rel: {e}")
+    
+    async def handle_mouse_wheel(self, data):
+        """Handle mouse wheel scrolling"""
+        try:
+            dx = data.get('dx', 0)
+            dy = data.get('dy', 0)
+            
+            if dy != 0:
+                # Vertical scroll
+                pyautogui.scroll(int(dy))
+            if dx != 0:
+                # Horizontal scroll (limited support)
+                pyautogui.hscroll(int(dx))
+                
+        except Exception as e:
+            logger.error(f"Error handling mouse wheel: {e}")
+    
+    def handle_mouse_buttons(self, buttons_mask: int):
+        """Handle mouse button presses based on bitmask"""
+        try:
+            # Left button (bit 0)
+            if buttons_mask & 1:
+                pyautogui.mouseDown(button='left')
+            else:
+                pyautogui.mouseUp(button='left')
+            
+            # Middle button (bit 1) 
+            if buttons_mask & 2:
+                pyautogui.mouseDown(button='middle')
+            else:
+                pyautogui.mouseUp(button='middle')
+                
+            # Right button (bit 2)
+            if buttons_mask & 4:
+                pyautogui.mouseDown(button='right')
+            else:
+                pyautogui.mouseUp(button='right')
+                
+        except Exception as e:
+            logger.error(f"Error handling mouse buttons: {e}")
+    
+    async def handle_keyboard(self, data):
+        """Handle keyboard input"""
+        try:
+            key = data.get('key', '')
+            down = data.get('down', False)
+            code = data.get('code', 0)
+            mods = data.get('mods', 0)
+            
+            # Convert key name to pyautogui format
+            pyautogui_key = self.convert_key_name(key)
+            
+            if down:
+                # Handle modifier keys
+                modifiers = []
+                if mods & 1:  # Ctrl
+                    modifiers.append('ctrl')
+                if mods & 2:  # Alt
+                    modifiers.append('alt')
+                if mods & 4:  # Shift
+                    modifiers.append('shift')
+                if mods & 8:  # Meta/Cmd
+                    modifiers.append('cmd')
+                
+                if modifiers:
+                    pyautogui.hotkey(*modifiers, pyautogui_key)
+                else:
+                    pyautogui.keyDown(pyautogui_key)
+            else:
+                pyautogui.keyUp(pyautogui_key)
+                
+        except Exception as e:
+            logger.error(f"Error handling keyboard: {e}")
+    
+    def convert_key_name(self, key: str) -> str:
+        """Convert Flutter key names to pyautogui key names"""
+        key_map = {
+            'Space': 'space',
+            'Enter': 'enter',
+            'Tab': 'tab',
+            'Escape': 'esc',
+            'Backspace': 'backspace',
+            'Delete': 'delete',
+            'Arrow Up': 'up',
+            'Arrow Down': 'down', 
+            'Arrow Left': 'left',
+            'Arrow Right': 'right',
+            'Home': 'home',
+            'End': 'end',
+            'Page Up': 'pageup',
+            'Page Down': 'pagedown',
+            'F1': 'f1', 'F2': 'f2', 'F3': 'f3', 'F4': 'f4',
+            'F5': 'f5', 'F6': 'f6', 'F7': 'f7', 'F8': 'f8',
+            'F9': 'f9', 'F10': 'f10', 'F11': 'f11', 'F12': 'f12',
+        }
+        return key_map.get(key, key.lower())
+    
+    async def handle_gamepad(self, data):
+        """Handle gamepad input (placeholder - could integrate with system gamepad APIs)"""
+        try:
+            index = data.get('index', 0)
+            buttons_mask = data.get('buttonsMask', 0)
+            lx = data.get('lx', 0.0)
+            ly = data.get('ly', 0.0)
+            rx = data.get('rx', 0.0)
+            ry = data.get('ry', 0.0)
+            lt = data.get('lt', 0.0)
+            rt = data.get('rt', 0.0)
+            
+            logger.debug(f"Gamepad {index}: buttons={buttons_mask}, lx={lx}, ly={ly}, rx={rx}, ry={ry}, lt={lt}, rt={rt}")
+            # TODO: Implement actual gamepad injection via system APIs
+            
+        except Exception as e:
+            logger.error(f"Error handling gamepad: {e}")
+    
+    async def handle_system_command(self, data):
+        """Handle system commands"""
+        try:
+            action = data.get('action', '')
+            logger.info(f"System command: {action}")
+            
+            if action == 'toggle-abs-rel':
+                logger.info("Mouse mode toggle requested")
+            elif action == 'clipboard-sync':
+                logger.info("Clipboard sync requested")
+            elif action == 'screenshot':
+                logger.info("Screenshot requested")
+            else:
+                logger.warning(f"Unknown system command: {action}")
+                
+        except Exception as e:
+            logger.error(f"Error handling system command: {e}")
     
     async def handle_signaling_message(self, message):
         """Handle incoming signaling messages"""
