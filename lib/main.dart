@@ -173,7 +173,7 @@ class RealDeskApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      initialRoute: AppRoutes.splash,
+      initialRoute: AppRoutes.connect,
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }
